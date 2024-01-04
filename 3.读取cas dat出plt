@@ -1,0 +1,144 @@
+定义包含 .lay 文件的目录路径：folderPath。
+定义开始时间 startTime 和结束时间 endTime。
+使用 dir 函数获取指定目录中所有的 .cas.h5 文件列表，并存储在 files 变量中。
+提取文件名，并排序文件名，存储在 sortedFileNames 变量中。
+初始化命令数组 commands，并初始化计数器 counter。
+遍历文件列表，提取每个文件名中的时间戳信息，然后根据一些条件判断是否生成命令，如果条件满足，就生成相应的命令并存储在 commands 数组中。
+最后，将生成的命令数组写入文本文件，文本文件的路径为 folderPath 下的 001.mcr。
+此外，代码还包括了一些辅助函数，例如 extractTime 用于从文件名中提取时间戳信息，generateOpenCmd 用于生成打开数据集的命令，generateNewInstructions 用于生成新指令，以及 writeCommandsToFile 用于将命令写入文件。
+
+
+
+
+
+
+
+
+
+
+% 定义包含 .lay 文件的目录
+folderPath = 'E:\useful\3.0\3.0'; % 使用双反斜杠
+ startTime = 0; % 开始时间
+    endTime = 1;
+% 获取目录中所有 .cas.h5 文件的列表
+files = dir(fullfile(folderPath, '*.cas.h5'));
+
+% 提取文件名
+fileNames = {files.name};
+
+% 排序文件名
+sortedFileNames = sort(fileNames);
+
+% 初始化命令数组
+commands = {'#!MC 1410'};
+
+% 初始化计数器
+counter = 0;
+
+% 遍历文件列表，生成命令
+for file = files'
+    counter = counter + 1;
+
+    [timeValue, isValid] = extractTime(file.name);
+    
+    if isValid && timeValue >= startTime && timeValue <= endTime
+        if mod(counter, 10) == 0
+            commands = [commands, generateOpenCmd(folderPath, file.name)];
+            commands = [commands, generateNewInstructions(folderPath, file.name)];
+        end
+    end
+end
+
+% 将命令数组写入文本文件
+writeCommandsToFile(commands, folderPath);
+
+% 辅助函数定义...
+
+% 请确保其他辅助函数（如 extractTime, generateOpenCmd, generateNewInstructions, writeCommandsToFile）保持不变。
+
+
+function [timeValue, isValid] = extractTime(fileName)
+    % 从文件名中提取时间戳
+    % 新的正则表达式匹配格式为 'ramtimezhui-2-0.000400.cas.h5' 的时间戳
+    tokens = regexp(fileName, '.*-(\d+)-(\d+\.\d+)\.cas\.h5', 'tokens');
+    if isempty(tokens)
+        timeValue = 0;
+        isValid = false;
+    else
+        timeValue = str2double(tokens{1}{2}); % 获取第二个匹配组，即时间戳
+        isValid = true;
+    end
+end
+
+
+function commands = generateOpenCmd(folderPath, fileName)
+  % 提取文件名前缀（去除.cas.h5部分）
+    prefix = regexprep(fileName, '\.cas\.h5$', '');
+
+    % 构造.cas.h5和对应的.dat.h5文件名
+    casFileName = sprintf('%s.cas.h5', prefix);
+    datFileName = sprintf('%s.dat.h5', prefix);
+
+    % 生成 $!ReadDataSet 命令
+    cmd1 = sprintf('$!ReadDataSet  ''"STANDARDSYNTAX" "1.0" "FILELIST_DATAFILES" "2" "%s\\%s" "%s\\%s"''', folderPath, casFileName, folderPath, datFileName);
+    cmd2 = 'DataSetReader = ''Fluent Common Fluid Files Loader''';
+    cmd3 = 'ReadDataOption = New';
+    cmd4 = 'ResetStyle = Yes';
+    cmd5 = 'AssignStrandIDs = Yes';
+    cmd6 = 'InitialPlotType = Automatic';
+    cmd7 = 'InitialPlotFirstZoneOnly = No';
+    cmd8 = 'AddZonesToExistingStrands = No';
+    cmd9 = 'VarLoadMode = ByName';
+
+    % 组合命令
+    commands = {cmd1, cmd2, cmd3, cmd4, cmd5, cmd6, cmd7, cmd8, cmd9};
+end
+
+
+
+
+function commands = generateNewInstructions(folderPath, fileName)
+    % 从文件名中提取.cas.h5前缀
+    [path, name, ~] = fileparts(fileName);
+    prefix = name;
+% 从.cas.h5文件名中提取前缀
+    prefix = regexprep(fileName, '\.cas\.h5$', '');
+    % 生成新指令
+   cmd10 = sprintf('$!AlterData \r\n  IgnoreDivideByZero = Yes\r\n  Equation = ''{a} = SQRT(1.4*287*{Static Temperature}) ''');
+    cmd11 = sprintf('$!AlterData \r\n  IgnoreDivideByZero = Yes\r\n  Equation = ''{V} = SQRT({X Velocity}**2 + {Y Velocity}**2) ''');
+    cmd12 = sprintf('$!AlterData \r\n  IgnoreDivideByZero = Yes\r\n  Equation = ''{Mach Number} = {V}/{a} ''');
+    cmd13 = sprintf('$!AlterData \r\n  IgnoreDivideByZero = Yes\r\n  Equation = ''{Density Gradient} = SQRT((ddx({Density}))**2+(ddy({Density}))**2)''');
+    cmd14 = sprintf('$!AlterData \r\n  IgnoreDivideByZero = Yes\r\n  Equation = ''{Normalized Pressure} = {Static Pressure} / 3466.756''');
+
+    % 更新 WriteDataSet 指令
+    % 更新 WriteDataSet 指令，输出到指定的子文件夹
+    pltFolderPath = fullfile(folderPath, 'plt'); % 定义plt子文件夹的路径
+    writeCmd1 = sprintf('$!WriteDataSet  "%s\\%s.plt"', pltFolderPath, prefix);
+    writeCmd2 = 'IncludeText = No';
+    writeCmd3 = 'IncludeGeom = No';
+    writeCmd4 = 'IncludeCustomLabels = No';
+    writeCmd5 = 'IncludeDataShareLinkage = Yes';
+    writeCmd10 = 'VarList =  [53-55]';
+    writeCmd6 = 'Binary = Yes';
+    writeCmd7 = 'UsePointFormat = No';
+    writeCmd8 = 'Precision = 9';
+    writeCmd9 = 'TecplotVersionToWrite = TecplotCurrent';
+
+    % 组合所有命令
+   commands = {cmd10, cmd11, cmd12, cmd13, cmd14, writeCmd1, writeCmd2, writeCmd3, writeCmd4, writeCmd5,  writeCmd6, writeCmd7, writeCmd8, writeCmd9};
+end
+
+
+
+function writeCommandsToFile(commands, folderPath)
+    outputFilePath = fullfile(folderPath, '001.mcr');
+    fid = fopen(outputFilePath, 'w');
+    if fid ~= -1
+        for i = 1:length(commands)
+            fprintf(fid, '%s\r\n', commands{i});
+        end
+        fclose(fid);
+    else
+        error('无法创建输出文件。');
+    end
+end
