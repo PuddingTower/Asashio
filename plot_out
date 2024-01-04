@@ -1,0 +1,99 @@
+% 打开文件
+filename = 'E:\useful\3.0\3.0\st-rfile_2_17161.out'; % 替换为您的实际文件名
+fid = fopen(filename, 'rt');
+
+% 定义远场压力
+p_ref = 5529.1; % 单位: 帕斯卡
+
+% 检查文件是否打开成功
+if fid == -1
+    disp('无法打开文件，请检查文件名和文件路径。');
+else
+    % 跳过文件开始的两行
+    fgetl(fid);
+    fgetl(fid);
+
+    % 提取第三行的代号
+    header_line3 = fgetl(fid);
+    header_split = regexp(header_line3, '"(.*?)"', 'tokens');
+    codeList = cellfun(@(x) x{1}, header_split, 'UniformOutput', false);
+
+    % 计算列数
+    num_columns = numel(codeList) + 1;
+
+    % 根据列数构建格式字符串
+    format_str = repmat('%f', 1, num_columns);
+
+    % 读取数据
+    data = textscan(fid, format_str, 'CollectOutput', true);
+    data = data{1};
+
+    % 关闭文件
+    fclose(fid);
+
+    % 找到'flowtime'列的索引
+    flowtime_index = find(strcmp(codeList, 'flow-time'));
+    if isempty(flowtime_index)
+        disp('未找到"flowtime"列，请检查数据文件。');
+        fclose(fid);
+        return;
+    end
+
+    % 使用'flowtime'列作为时间数据
+    time_data = data(:, flowtime_index);
+
+    % 初始化图形
+    figure;
+    hold on;
+
+    % 定义标记符号和颜色
+    markers = {'o', 's', 'd', '^', 'v', '>', '<', 'p', 'h', '*', '+', 'x'};
+    colors = lines(num_columns - 1);
+
+    % 询问用户输入多个代号
+    input_codes = input('请输入要提取数据的代号，用逗号分隔：', 's');
+    input_code_list = strsplit(input_codes, ',');
+
+    % 初始化pressure_data数组
+    pressure_data = [];
+
+    % 对每个代号进行循环
+    for i = 1:length(input_code_list)
+        % 去除可能的空格
+        current_code = strtrim(input_code_list{i});
+        % 找到代号对应的列
+        column_index = find(strcmp(codeList, current_code));
+        if isempty(column_index)
+            disp(['代号 ' current_code ' 未找到，请检查输入是否正确。']);
+        else
+            % 归一化压力数据
+            normalized_pressure = data(:, column_index) / p_ref;
+
+            % 将数据添加到pressure_data数组
+            pressure_data = [pressure_data, normalized_pressure];
+
+            plot(time_data, normalized_pressure, 'DisplayName', current_code, ...
+            'Color', colors(mod(i - 1, size(colors, 1)) + 1, :), ...
+            'LineWidth', 2); % 这里加入'LineWidth'
+        end
+    end
+
+ % 设置坐标轴和图例的科研风格
+xlabel('Time (s)', 'Interpreter', 'latex', 'FontSize', 14, 'FontName', 'Times New Roman');
+ylabel('${P}/{P_0}$', 'Interpreter', 'latex', 'FontSize', 14, 'FontName', 'Times New Roman');
+
+title('Normalized Pressure Over Time', 'Interpreter', 'latex', 'FontSize', 16, 'FontName', 'Times New Roman');
+
+% 设置图例，增加字体大小
+legend('show', 'Location', 'best', 'Interpreter', 'latex', 'FontSize', 12, 'FontName', 'Times New Roman');
+
+% 设置坐标轴属性，包括字体大小和字体类型
+set(gca, 'XMinorTick', 'on', 'YMinorTick', 'on', 'TickLabelInterpreter', 'latex', 'FontSize', 12, 'FontName', 'Times New Roman');
+
+% 设置网格
+grid on;
+grid minor;
+
+hold off;
+
+end
