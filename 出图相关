@@ -1,0 +1,8 @@
+本文件夹中主要与tecplot 相关
+1.让读取cas dat出plt相关：由于数值纹影的图片使用的
+{Density Gradient} = SQRT((ddx({Density}))**2+(ddy({Density}))**2)
+转换无法直接使用cas dat直接出lay文件，必须先出plt，所以先执行此程序
+
+2.批量出lay文件——创建模板lay，然后使文件夹每个plt都生成对应的lay文件
+
+3.导出图片
