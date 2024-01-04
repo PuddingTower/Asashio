@@ -1,0 +1,95 @@
+%plot_out后续写了一个出csv的代码，用了那个代码就能进行短时傅里叶了
+%网上查到的SFTF好像都不太好用，包括auto_signal那个流程有点负载
+%这篇代码里也需要调很多参数，但其实auto_signal也要调很久才能找到想要的效果
+
+
+filename = 'combined_data.csv'; % 根据文件路径进行调整
+data = readtable(filename, 'VariableNamingRule', 'preserve');
+
+% 提取时间数据
+time_data = data{:, 1}; 
+
+% 提取压力数据
+% 由于第二列的标题是一个数字，我们使用data{:, 2}来提取
+pressure_data = data{:, 2};
+
+% 计算采样率
+sampling_rate = 1 / (time_data(2) - time_data(1)); % 假设数据是均匀采样的
+
+
+
+
+% 输入起始时间与结束时间
+start_time = 0.01;
+end_time = 0.02;
+
+% 对数据进行截取
+start_index = find(time_data >= start_time, 1);
+end_index = find(time_data <= end_time, 1, 'last');
+pressure_data = pressure_data(start_index:end_index);
+time_data = time_data(start_index:end_index);
+
+% 以下是您原始代码的后续部分...
+
+
+
+% 生成新的压力数据集
+w_0 = zeros(size(pressure_data));
+for i = 1:4:length(pressure_data)-3
+    w_0(i:i+3) = mean(pressure_data(i:i+3));
+end
+
+% 生成新的压力数据集
+p_0 = pressure_data - w_0;
+
+
+
+%% 
+% 执行STFT
+fs = 20000; % 采样频率
+window_size = round(fs * 0.005); % 0.2秒间隔的窗口大小
+noverlap = round(window_size * 0.1); % 窗口之间30%的重叠
+[~, F, T, P] = spectrogram(p_0, window_size, noverlap, [], fs, 'yaxis');
+
+% 计算能量矩阵
+energy_matrix = abs(P).^2;
+
+% 计算频率-能量分布
+freq_energy_dist = zeros(length(F), length(T));
+for i = 1:length(T)
+    for j = 1:length(F)
+        % 找到此段的频率范围
+        freq_range = F >= (j-1)*10 & F < j*10;
+        % 计算此频率范围内的能量
+        energy = sum(energy_matrix(freq_range, i));
+        % 将能量分配给频率-能量分布矩阵
+        freq_energy_dist(j, i) = energy;
+    end
+end
+
+%% 
+% 设置频率范围
+freq_range = F >= 1 & F < 10000;
+new_F = linspace(min(F(freq_range)), max(F(freq_range)), length(F(freq_range))*10);
+freq_energy_dist_interp = interp2(T, F(freq_range), freq_energy_dist(freq_range,:), T, new_F.');
+
+% 进一步模糊图像的边缘
+h = fspecial('gaussian', [5 5], 4);
+freq_energy_dist_blurred_more = imfilter(freq_energy_dist_interp, h);
+
+% 增加图像的分辨率
+freq_energy_dist_blurred_more_resized = imresize(freq_energy_dist_blurred_more, [size(freq_energy_dist_blurred_more,1)*10, size(freq_energy_dist_blurred_more,2)*10]);
+
+% 绘制具有更高分辨率和更模糊边缘的频率-能量分布
+figure;
+imagesc(time_data(start_index:end_index), flip(new_F), freq_energy_dist_blurred_more_resized); % y轴方向是正确的
+axis tight;
+view(0, 90);
+xlabel('Time (s)', 'FontName', 'times new roman', 'FontSize', 18, 'FontWeight', 'bold', 'Position', [0.5, -0.1, 0]);
+ylabel('Pressure Oscillation Data', 'FontName', 'times new roman', 'FontSize', 18, 'FontWeight', 'bold');
+title('Frequency-Energy Distribution', 'FontName', 'times new roman', 'FontSize', 18, 'FontWeight', 'bold');
+colorbar('eastoutside');
+colormap("jet"); % 将色图设置为红色以表示高能量水平
+set(gca,'FontWeight','bold', 'FontName', 'times new roman', 'FontAngle', 'italic'); % 设置字体加粗、字体为times new roman、字体倾斜
+% axis off
+set(gca,'YDir','normal')
