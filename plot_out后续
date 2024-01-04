@@ -1,0 +1,22 @@
+%你可以在程序后加入一下程序以导出你所画出的单条数据线；这样就可以进行后续的喘振频率分析
+
+% 假设 time_data 是一个列向量，pressure_data 是一个列向量或二维数组
+
+% 合并数据
+if isvector(pressure_data)
+    % 如果pressure_data是列向量，则直接合并
+    combined_data = [time_data, pressure_data];
+else
+    % 如果pressure_data是二维数组，则按列合并
+    combined_data = [time_data, pressure_data];
+end
+
+% 指定CSV文件名
+filename = 'combined_data.csv';
+
+% 保存数据到CSV文件
+writematrix(combined_data, filename);
+
+% 显示信息
+disp(['数据已保存到文件: ', filename]);
+
